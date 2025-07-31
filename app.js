@@ -135,7 +135,7 @@ const sendMessage = async (buttonMessage = null) => {
     loadingIndicator.classList.remove('active');
 };
 
-// Function to get bot response from Gemini API
+// Function to get bot response from Gemini API (now via Vercel Serverless Function)
 const getBotResponse = async (userMessage) => {
     let prompt = `
     Eres **Explora tu vocación con IA - Expo carreras 2026**, un asistente vocacional, diseñado para guiar a estudiantes de 5º y 6º año de la secundaria en la provincia de La Pampa, Argentina. Tu misión es facilitar un proceso de autodescubrimiento y reflexión que conecte la identidad personal del estudiante con la exploración de la oferta académica superior de manera accesible, clara y profesional. Eres una herramienta de apoyo para el primer paso de la orientación, no un reemplazo de un orientador humano.
@@ -355,25 +355,32 @@ const getBotResponse = async (userMessage) => {
     conversationHistory.forEach(msg => {
         chatHistory.push({ role: msg.sender === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] });
     });
+    // Agrega el prompt final como el último mensaje del usuario para el modelo
     chatHistory.push({ role: "user", parts: [{ text: prompt }] });
 
     try {
-        const payload = { contents: chatHistory };
-        const apiKey = ""; // Canvas will provide this if empty
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        // La URL ahora apunta a tu propia función serverless en Vercel
+        const apiUrl = '/api/gemini'; // Ruta relativa a tu aplicación en Vercel
 
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            // Envía el historial de chat completo a la función serverless
+            body: JSON.stringify({ chatHistory: chatHistory })
         });
 
         const result = await response.json();
 
-        if (result.candidates && result.candidates.length > 0 &&
-            result.candidates[0].content && result.candidates[0].content.parts &&
-            result.candidates[0].content.parts.length > 0) {
-            let botResponse = result.candidates[0].content.parts[0].text;
+        // Si la función serverless devuelve un error (ej. por clave API no encontrada)
+        if (response.status !== 200) {
+            console.error("Error de la función serverless:", result.error);
+            displayMessage("Disculpá, hubo un problema en el servidor. Por favor, intentá de nuevo más tarde o verificá la configuración de la API Key en Vercel.", 'bot');
+            return; // Salir para no procesar como respuesta exitosa
+        }
+
+        // Si la respuesta es exitosa, el texto viene en result.text
+        if (result.text) {
+            let botResponse = result.text;
 
             // Check for the hidden marker to show confirmation buttons
             if (botResponse.includes('---CONFIRMAR_SI_NO---')) {
@@ -390,14 +397,13 @@ const getBotResponse = async (userMessage) => {
             updatePhase(currentPhase, userMessage, botResponse);
 
         } else {
-            console.error("Unexpected API response structure:", result);
-            // Updated error message as per user request
-            displayMessage("Disculpá, no pude generar una respuesta. Para usar la aplicación es necesario que inicies sesión en tu cuenta de Gmail.", 'bot');
+            console.error("Estructura de respuesta inesperada de la función serverless:", result);
+            displayMessage("Disculpá, no pude generar una respuesta. Hubo un problema con la respuesta del modelo.", 'bot');
         }
     } catch (error) {
-        console.error("Error calling Gemini API:", error);
-        // Updated error message as per user request
-        displayMessage("Disculpá, no pude generar una respuesta. Para usar la aplicación es necesario que inicies sesión en tu cuenta de Gmail.", 'bot');
+        console.error("Error al llamar a la función serverless:", error);
+        // Mensaje de error más específico para problemas de red o de la función serverless
+        displayMessage("Disculpá, no pude generar una respuesta. Parece haber un problema de conexión o con el servidor. Por favor, intentá de nuevo.", 'bot');
     }
 };
 
