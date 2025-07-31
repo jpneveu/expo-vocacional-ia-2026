@@ -1,0 +1,13 @@
+{
+  "name": "expo-vocacional-ia-2026",
+  "version": "1.0.0",
+  "description": "Aplicación para explorar vocaciones con IA para Expo Carreras 2026",
+  "main": "index.html",
+  "scripts": {
+    "start": "vercel dev",
+    "build": "echo 'No build step required for static assets and serverless functions'"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.15.0"
+  }
+}
